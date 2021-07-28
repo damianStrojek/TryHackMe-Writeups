@@ -41,7 +41,8 @@ before from 80/443 port scan.
   2. Thomas' address : 21 Highland Court in Yorkshire, England
   3. His mail : me@thomaswreath.thm
 
-  Next up we can see that the page was done with the help of Online CV design by ThemeHippo. Sometimes it is useful information, for example when the site is made with wordpress.
+  Next up we can see that the page was done with the help of Online CV design by ThemeHippo. Sometimes it is useful information, for example when the site
+  is made with wordpress.
   Normally we should enumerate this page with dirb/dirbuster/gobuster and maybe directory-list-2.3-medium.txt but for now we'll move on to the next service.
   ### Webmin HTTP
   We can start with checking if this version of the webmin is vulnerable to any exploit. Quick search with google gives us information that we wanted.
@@ -82,7 +83,26 @@ before from 80/443 port scan.
   cat /etc/hosts
   cat /etc/resolv.conf
   ```
+  ### Theory behind pivoting
+  Things that I'll focus on :
+  - Proxy tools
+  - Port forwarding methods
+  - Stable linux shell with socat
+  - Chisel as your proxy/port forwarding tool
+  - sshuttle as your tunnelled proxy
+  #### Proxy tool #1 - Proxychains
+  Proxychains is a command line tool which is activated by prepending the command _proxychains_ to other commands. For example to proxy netcat it would look like this :
+  ```
+  proxychains nc 10.200.159.200 22
+  ```
+  The proxy port was not specified in the above command because proxychains reads its options from a config file (/etc/proxychains.conf). If you want to configure proxychains
+  for a specific assignment you can copy this config file and make any changes in a copy stored in your current directory.
   
+  One of the things to note when scanning through proxychains is that you can only use TCP scans. Because of that if you want to proxy nmap through proxychains you should always
+  enable the -Pn switch to prevent from issuing ICMP echo requests.
+  #### Proxy tool #2 - FoxyProxy
+  This is an extension to your browser that you are probably already familiar with because a lot of pentesters use this tool to manage their BurpSuite/ZAP proxy quickly and
+  easily. There is not much to say about this extension because it's really easy to use and manage.
   
   
   
