@@ -1,6 +1,10 @@
 # Wreath Room
 Link to the room : https://tryhackme.com/room/wreath
+
+
 My IP address : 10.10.156.24
+
+
 My OS : Kali GNU/Linux 2021.2
 
 ## Gathered information about the network :
