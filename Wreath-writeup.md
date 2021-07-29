@@ -325,10 +325,21 @@ before from 80/443 port scan.
   nmap -p- 10.200.159.100,150
   
   10.200.159.100
-  PORT
+  PORT  STATE   SERVICE
+  80    open    http 
+  3389  open    ms-wbt-server
+  5985  open    wsman
   
+  10.200.159.150
+  We can assume that this host is not accessible from our current position in the network because all of the ports are filtered.
   ```
+  Without proxy we cannot perform a service detection scan on the target so we will assume that those identified services are accurate. It seems that the most vulnerable service 
+  is the http on port 80.
   
+  ## Pivoting
+  
+  Right now we have to choose a pivoting technique and use it to connect to the web service on port 80 of host 10.200.159.100. I will do it using sshuttle to get some experience 
+  with that tool.
   
   
   
