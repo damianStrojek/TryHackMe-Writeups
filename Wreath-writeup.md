@@ -303,6 +303,32 @@ before from 80/443 port scan.
   ```
   If you don't already know `-sn` switch is used to tell nmap not to scan any port and instead just determine which hosts are alive. We can do the same with `fping`.
   After that we can focus only on those hosts that are alive instead of scanning the whole network and all ports. It would be waste of our time.
+  ```
+  Nmap scan report for ip-10-200-159-1.eu-west-1.compute.internal (10.200.159.1)
+  Cannot find nmap-mac-prefixes: Ethernet vendor correlation will not be performed
+  Host is up (-0.18s latency).
+  MAC Address: 02:98:7F:EB:16:FB (Unknown)
+  Nmap scan report for ip-10-200-159-100.eu-west-1.compute.internal (10.200.159.100)
+  Host is up (0.00016s latency).
+  MAC Address: 02:81:EA:BC:A8:2F (Unknown)
+  Nmap scan report for ip-10-200-159-150.eu-west-1.compute.internal (10.200.159.150)
+  Host is up (0.00012s latency).
+  MAC Address: 02:DC:AC:DE:3C:C3 (Unknown)
+  Nmap scan report for ip-10-200-159-250.eu-west-1.compute.internal (10.200.159.250)
+  Host is up (0.00017s latency).
+  MAC Address: 02:B9:77:CE:A4:C7 (Unknown)
+  Nmap scan report for ip-10-200-159-200.eu-west-1.compute.internal (10.200.159.200)
+  Host is up.
+  ```
+  If we exclude our host and those hosts that are not in-scope we get two alive hosts - 10.200.159.100 and 10.200.159.150.
+  ```
+  nmap -p- 10.200.159.100,150
+  
+  10.200.159.100
+  PORT
+  
+  ```
+  
   
   
   
