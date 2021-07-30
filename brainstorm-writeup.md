@@ -31,3 +31,6 @@ a .dll file. We cannot go into webpage of port 9999 so we can try to connect wit
 nc -v 10.10.156.134 9999
 ```
 We succeed! Now we are asked for username (max 20 characters). We are suspecting that this port is the attack vector for the buffer overflow. I tried 
+
+
+TBC
