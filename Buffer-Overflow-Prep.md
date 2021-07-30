@@ -3,13 +3,15 @@
 
 Link to the room : https://tryhackme.com/room/bufferoverflowprep
 
+Target IP address  10.10.179.101
+
 My OS : Kali GNU/Linux 2021.2
 
 ## Accessing the machine and overview
 
 I am told to access the target machine using RDP with given credentials :
 ```
-xfreerdp /u:admin /p:password /cert:ignore /v:<TARGET IP> /workarea
+xfreerdp /u:admin /p:password /cert:ignore /v:10.10.179.101 /workarea
 ```
 After successfully accessing the machine I can get to work but before that we must know how the whole vulnerability works. A buffer overflow condition exists when 
 a program attempts to put more data in a buffer than it can hold or when a program attempts to put data in a memory area past a buffer. In this case, a buffer is a 
