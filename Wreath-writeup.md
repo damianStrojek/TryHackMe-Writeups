@@ -7,7 +7,22 @@ My IP address : 10.50.156.24
 
 My OS : Kali GNU/Linux 2021.2
 
-[click](#checking-services)
+# Table of Contents
+1. [Enumeration](#enumeration)
+2. [Checking services](#checking-services)
+3. [Pivoting part 1](#pivoting)
+    1. [Proxychains](#proxy-tool-1-proxychains)
+    2. [FoxyProxy](#proxy-tool-2-foxyproxy)
+    3. [Forwarding connections](#forwarding-connections)
+    4. [Reverse connections](#reverse-connections)
+    5. [SSH](#windows-command-line-ssh)
+    6. [Socat](#socat)
+    7. [Chisel](#chisel)
+    8. [Sshuttle](#sshuttle)
+4. [Enumeration before pivoting](#enumerating-before-pivoting)
+5. [Pivoting part 2](#pivoting-continued)
+6. [Post exploitation Windows](#post-exploitation-of-windows-machine)
+7. [Command and Control Empire](#command-and-control---empire-tool)
 
 ## Gathered information about the network :
 
@@ -102,7 +117,7 @@ Which style of pivoting is more suitable will depend entirely on the layout of t
   - Chisel as your proxy/port forwarding tool
   - sshuttle as your tunnelled proxy
 
-  ### Proxy tool #1 - Proxychains
+  ### Proxy tool 1 Proxychains
   
   Proxychains is a command line tool which is activated by prepending the command _proxychains_ to other commands. For example to proxy netcat it would look like this :
   ```
@@ -114,7 +129,7 @@ Which style of pivoting is more suitable will depend entirely on the layout of t
   One of the things to note when scanning through proxychains is that you can only use TCP scans. Because of that if you want to proxy nmap through proxychains you should always
   enable the -Pn switch to prevent from issuing ICMP echo requests.
   
-  ### Proxy tool #2 - FoxyProxy
+  ### Proxy tool 2 FoxyProxy
   
   This is an extension to your browser that you are probably already familiar with because a lot of pentesters use this tool to manage their BurpSuite/ZAP proxy quickly and
   easily. There is not much to say about this extension because it's really easy to use and manage.
@@ -432,7 +447,7 @@ xfreerdp /v:127.0.0.1:8002 /u:<USERNAME> /p:<PASSWORD> /drive:/usr/share/windows
   ```
   Just like this we were able to establish a stable shell.
   
-## Command and Control (Empire tool)
+## Command and Control - Empire tool
 
 What after getting the stable shell? With a foothold in a target network, we can start looking to bring what is known as a *C2 (Command and Control) Framework* into play. C2 
 Frameworks are used to consolidate an attacker's position within a network and simplify post-exploitation steps (privesc, AV evasion, pivoting, looting etc.), as well as 
