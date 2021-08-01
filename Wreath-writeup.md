@@ -714,7 +714,30 @@ Powershell Empire has several major sections to it :
   then it will be executed by the website as a PHP file. 
     
   The easiest place to stick the shell is in the exifdata for the image -- specifically in the `Comment` field to keep it nicely out of the way. Take a random image and then 
-  check the exifdata of this file using `exiftool` . To add payload to our image we once again use exiftool  ```exiftool -Comment="<PHP PAYLOAD>" <NAME OF THE FILE>```.
+  check the exifdata of this file using `exiftool` . To add payload to our image we once again use exiftool  :  
+  ```
+	exiftool -Comment="<PHP PAYLOAD>" <NAME OF THE FILE>
+	```
+	
+	### Bypassing the antivirus	
+		
+	We now need to figure out how to make a PHP script that will bypass the antivirus software. What we need to do is build a payload that does what we need it to do, then we 
+	obfuscate it either manually or by using one of the many tools available online.
+		
+	Now there are a variety of measures we could take here, including but not limited to :
+		- Switching parts of the exploit around so that they're in an unusual order
+		- Encoding all of the strings so that they're not recognisable
+		- Splitting up distinctive parts of the code
+	For the sake of this experience we'll use online tool called php-obfuscator available at https://www.gaijin.at/en/tools/php-obfuscator . As this is getting passed into a bash 
+	command we will need to escape the dollar signs `$p0` -> `\$p0` and with that obfuscated payload we can finish off our exploit. This gives us possibility to execute commands 
+	through this webshell but let's get the full reverse shell.
+	
+	### Full Reverse Shell
+
+	The quick and easy option to do this is to upload a netcat into target machine. Because the versions of netcat for Windows that comes with Kali is known to Defender we are 
+	going to use one of the versions from github ([this repository](https://github.com/int0x33/nc.exe/) )
 		
 		
-		witam
+		
+		
+		
