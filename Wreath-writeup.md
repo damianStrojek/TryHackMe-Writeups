@@ -25,6 +25,10 @@ My OS : Kali GNU/Linux 2021.2
 7. [Command and Control Empire](#command-and-control---empire-tool)
 8. [Getting agent back from the Git Server](#getting-agent-back-from-the-git-server)
 9. [Enumeration of the last machine](#enumeration-of-the-last-machine)
+10. [Last Machine](#the-last-machine)
+    1. [Finding vulnerability](#finding-vulnerabilities)
+    2. [Exploiting vulnerability](#exploiting-vulnerability)
+11. [Antivirus Evasion](#antivirus-evasion)
 
 ## Gathered information about the network :
 
