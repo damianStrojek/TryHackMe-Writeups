@@ -5,6 +5,8 @@ Link to the room : https://tryhackme.com/room/wreath
 
 My IP address : 10.50.156.24
 
+Target IP addresses : 10.200.159.200 -> 10.200.159.150 -> 10.200.159.100
+
 My OS : Kali GNU/Linux 2021.2
 
 # Table of Contents
@@ -25,10 +27,12 @@ My OS : Kali GNU/Linux 2021.2
 7. [Command and Control Empire](#command-and-control---empire-tool)
 8. [Getting agent back from the Git Server](#getting-agent-back-from-the-git-server)
 9. [Enumeration of the last machine](#enumeration-of-the-last-machine)
-10. [Last Machine](#the-last-machine)
+10. [Antivirus Evasion](#antivirus-evasion)
+11. [Last Machine](#the-last-machine)
     1. [Finding vulnerability](#finding-vulnerabilities)
     2. [Exploiting vulnerability](#exploiting-vulnerability)
-11. [Antivirus Evasion](#antivirus-evasion)
+    3. [Bypassing the antivirus](#bypassing-the-antivirus)
+    4. [Full reverse shell access](#full-reverse-shell)
 
 ## Gathered information about the network :
 
@@ -624,6 +628,45 @@ Powershell Empire has several major sections to it :
   And the final step is to set up our proxy to proxy through 127.0.0.1:9090. With that enabled we can browse to the website hosted on the last PC. Using *Wappalyzer* we can 
   identify the server-side programming language, that is php 7.4.11.
 
+## Antivirus Evasion
+  By nature the AV Evasion is a rapidly changing topic. It's a constant dance between hackers and developers. Every time the developers release a new feature, the hackers 
+  develop a way around it. Every time the hackers bypass a new feature, the developers release another feature to close off the exploit, and so the cycle continues. 
+  When it comes to AV evasion we have two primary types available :
+    - On-Disk evasion - When we try to get a file saved on the target, then executed. This is very common when working with executable files.
+    - In-Memory evasion - When we try to import a script directly into memory and execute it there. 
+    
+  In therms of methodology : ideally speaking, we would start by attempting to fingerprint the AV on the target to get an idea of what solution we're up againts. As this is 
+  often an interactive process, we will skip it for now and assume that the target is running the default Windows Defender so that we can get straight into the meat of the 
+  topic. If we already have a shell on the target, we may also be able to use programs such as `SharpEDRChecker` and `Seatbelt` to identify the antivirus solution installed.
+  Once we know the OS version and AV of the target we would then attempt to replicate this environment in a virtual machine which we can use to test payloads against. Once we 
+  have a working payload we cen than deploy it against the target.
+    
+  ### Antivirus Detection Methods
+    
+  Generally speaking, detection methods can be classified into one of two categories :
+    - Static Detection
+    - Dynamic / Heuristic / Behavioural Detection
+	
+	*Static detection* methods usually involve some kind of signature detection. A very rudimetary system, for example, would be taking the hashsum of the suspicious file and 
+	comparing it against a database of known malware hashsums. This system does tend to be used; however, it would never be used by itself in modern antivirus solutions. For this 
+	reason it's usually a good idea to change _something_ when working with a known exploit. The smallest change to teh file will result in a completely different hashsum.
+		
+	Fortunately (or unfortunately for hackers) this is usually nowhere near enough to bypass static detection methods. The other form of static detection which is often used in 
+	antivirus software is a technique called *Byte matching*. Byte matching is another form of signature detection which works by searching through the program looking to 
+	match sequences of bytes against a known database of bad byte sequences. This is much more effective than just hashing the entire file. Of course it also means that we 
+	have a much harder job tracking down the exact line of code responsible for the flag.
+		
+	*Dynamic methods* look at how the file _acts_. AV software can go through the executable line-by-line checking the flow of execution (basec on pre-defined rules about what 
+	type of action is malicious) or the suspicious software can outright be executed inside a sandbox environment under close supervision from the AV software. If the program acts 
+	maliciously then it is quarantined and flagged as malware.
+		
+	Evading these measures is still perfectly possible, although a lot harder than evading static detection techniques. Sandboxes tend to be relatively distinctive so we just need 
+	to look for various system values (e.g. is there a fan installed, is there a GUI, any distinctive tools like VMtools) and check to see if there are any red flags. For example 
+	a machine with no fan no GUI and a classic VM service is very likely to be sandbox -- in which case the program should just exit. Then the AV software is fooled into believing 
+	that it's safe and allows it to be executed on the target.
+	Equally the AV software is still only working with a set of rules to check malicious behaviour. If the malware acts in a way that is unexpected (e.g. random code that does 
+	the grand sum of nothing) then it will likely pass this detection method.
+		
 ## The last machine
     
   ### Finding vulnerabilities
@@ -671,30 +714,7 @@ Powershell Empire has several major sections to it :
   then it will be executed by the website as a PHP file. 
     
   The easiest place to stick the shell is in the exifdata for the image -- specifically in the `Comment` field to keep it nicely out of the way. Take a random image and then 
-  check the exifdata of this file using `exiftool`. To add payload to our image we once again use exiftool :
-  ```
-  exiftool -Comment="<PHP PAYLOAD>" <NAME OF THE FILE>
-  ```
-  
-## Antivirus Evasion
-  By nature the AV Evasion is a rapidly changing topic. It's a constant dance between hackers and developers. Every time the developers release a new feature, the hackers 
-  develop a way around it. Every time the hackers bypass a new feature, the developers release another feature to close off the exploit, and so the cycle continues. 
-  When it comes to AV evasion we have two primary types available :
-    - On-Disk evasion - When we try to get a file saved on the target, then executed. This is very common when working with executable files.
-    - In-Memory evasion - When we try to import a script directly into memory and execute it there. 
-    
-  In therms of methodology : ideally speaking, we would start by attempting to fingerprint the AV on the target to get an idea of what solution we're up againts. As this is 
-  often an interactive process, we will skip it for now and assume that the target is running the default Windows Defender so that we can get straight into the meat of the 
-  topic. If we already have a shell on the target, we may also be able to use programs such as `SharpEDRChecker` and `Seatbelt` to identify the antivirus solution installed.
-  Once we know the OS version and AV of the target we would then attempt to replicate this environment in a virtual machine which we can use to test payloads against. Once we 
-  have a working payload we cen than deploy it against the target.
-    
-  ### Antivirus Detection Methods
-    
-  Generally speaking, detection methods can be classified into one of two categories :
-    - Static Detection
-    - Dynamic / Heuristic / Behavioural Detection
-  
-  
-  
-  
+  check the exifdata of this file using `exiftool` . To add payload to our image we once again use exiftool  ```exiftool -Comment="<PHP PAYLOAD>" <NAME OF THE FILE>```.
+		
+		
+		witam
