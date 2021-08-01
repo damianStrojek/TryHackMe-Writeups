@@ -7,6 +7,8 @@ My IP address : 10.50.156.24
 
 My OS : Kali GNU/Linux 2021.2
 
+[click](#checking-services)
+
 ## Gathered information about the network :
 
 - There are three machines on the network, where at least one has public facing webserver turned on
@@ -456,7 +458,6 @@ Powershell Empire has several major sections to it :
   - Agents - are the equivalent of a Metasploit "Session". They are connections to compromised targets, and allow an attacker to further interact with the system.
   - Modules - used in conjuction with agents to perform further exploitation. For example they can work through an existing agent to dump the password hashes from the server.
 
-  
   
   
   
