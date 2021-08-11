@@ -216,4 +216,36 @@ Get-ChildItem | Sort-Object
      ```
 
 ## Basic Scripting Challenge
-
+  
+     In the next task we are supposed to write our own script and run it to do more complex and powerful actions. The emails folder on the Desktop contains copes of the emails 
+     John, Martha and Mary have been sending to each other. We need to answer following questions with regards to these emails. To write those scripts I am using Windows 
+     Powershell ISE.
+  1. What file contains the password?
+  2. What is the password?
+  3. What files contains an HTTPS link?
+     ```
+     $path = "C:\Users\Administrator\Desktop\emails\*"
+     $string1 = "password"
+     $string2 = "https"
+     $script1 = Get-ChildItem -Path $path -Recurse | Select-String -Pattern $string1
+     $script2 = Get-ChildItem -Path $path -Recurse | Select-String -Pattern $string2
+     echo $script1
+     echo $script2
+      
+     doc3m.txt
+     password : johnisalegend99
+     doc2mary.txt
+     ```
+## Intermediate Scripting
+  
+     Now we need to write a script that will carry on a simple port scan using Powershell. I used Test-NetConnection and couldn't get the answer right because the output I was 
+     given tells that there is only 1 port open. I don't really know why but this is the script with the correct answer :
+     
+  1. How many open ports did you find between 130 and 140?
+     ```
+     for($p=130; $p -le 140; $p++){
+         Test-NetConnection localhost -Port $p
+     }
+      
+     11
+     ```
